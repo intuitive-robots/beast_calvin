@@ -6,7 +6,7 @@
 ## Installation
 To begin, clone this repository locally
 ```bash
-git clone --recurse-submodules git@github.com:BEAST-NeurIPS2025-Submission/beast_calvin.git
+git clone git@github.com:intuitive-robots/beast_calvin.git
 export BEAST_ROOT=$(pwd)/beast_calvin
 
 ```
