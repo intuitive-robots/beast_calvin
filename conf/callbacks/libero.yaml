@@ -1,0 +1,42 @@
+ema:
+  _target_: beast.callbacks.ema.EMA
+  decay: 0.999
+  start_step: 0
+  save_ema_weights_in_callback_state: True
+  evaluate_ema_weights_instead: True
+
+  power: 0.6666666666666666
+  inv_gamma: 1.0
+  min_value: 0.0
+  max_value: 0.9999
+
+rollout_lh:
+  _target_: beast.rollout.libero_rollout.RolloutLibero
+  _recursive_: false
+  env_cfg:
+    _target_: beast.wrappers.hulc_wrapper.HulcWrapper
+  skip_epochs: ${rollout_lh_skip_epochs}
+  benchmark_name: ${libero_benchmark}
+  rollout_freq: 10
+  num_videos: 0
+  num_sequences: 20 # 128
+  max_steps: 520
+  empty_cache: false
+  debug: false
+  n_eval: 50
+  num_procs: 10
+  use_mp: false
+  task_embedding_format: clip
+  device: ${device}
+
+
+checkpoint:
+  _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  save_top_k: 1
+  verbose: True
+  monitor: eval_lh/avg_seq_len
+  mode: max
+  dirpath: saved_models
+  filename: '{epoch:02d}_{eval_lh/avg_seq_len:.2f}' #put back in when PL fixes this _{val/accuracy:.4f}'
+  every_n_epochs: ${callbacks.rollout_lh.rollout_freq}
+  save_last: True

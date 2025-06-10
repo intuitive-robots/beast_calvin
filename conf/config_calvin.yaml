@@ -1,0 +1,81 @@
+defaults:
+  - callbacks: calvin
+  - datamodule: calvin
+  - model: beast_f 
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+root_data_dir: <PATH to your dataset>
+lang_folder: lang_clip_resnet50
+
+log_dir: ./logs
+slurm: false
+seed: 242
+device: 'cuda'
+batch_size: 8 # 38 # 128
+devices: 1 # 4
+act_dim: 7
+proprio_dims: 7
+obs_dim: 512
+goal_dim: 512
+obs_seq_len: 1
+act_seq_len: 20
+multistep: ${act_seq_len}
+p_last_state: 0
+gen_img_res: 112
+max_epochs: 300
+rollout_lh_skip_epochs: 14
+num_workers: 12
+benchmark_name: calvin_abc # calvin_abcd
+use_extracted_rel_actions: true
+
+vlm_path: microsoft/Florence-2-base
+
+### MP Tokenizer
+num_basis: 10
+seq_len: ${act_seq_len}
+vocab_size: 256
+degree_p: 4 # higher the smoother
+
+init_pos: False # if enabling the init_pos
+
+pre_compute_w_bound: False # True, False
+pre_compute_w_bound_steps: 10000 # 1000
+update_w_bound: True # True, False
+
+trainer:
+  devices: ${devices}
+  precision: bf16-mixed
+  max_epochs: ${max_epochs}
+  sync_batchnorm: True
+  accelerator: gpu
+  strategy: "ddp" 
+  limit_train_batches: 1000
+  limit_val_batches: 4
+
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  save_dir: .
+  name: logger
+  group: beast
+  log_model: false
+  project: BeastF_${benchmark_name}
+  entity: <YourEntityName>
+  id: seq_${act_seq_len}_basis_${num_basis}_${vlm_path}
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}_seed${seed}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir
+          - datamodule.root_data_dir
+          - trainer.gpus
+          - datamodule.num_workers
+          - trainer.limit_train_batches
+          - trainer.limit_val_batches

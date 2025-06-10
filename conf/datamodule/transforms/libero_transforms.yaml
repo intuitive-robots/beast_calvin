@@ -1,0 +1,45 @@
+train:
+  rgb_static:
+    # - _target_: torchvision.transforms.ToTensor
+    - _target_: torchvision.transforms.Resize
+      size: 112
+      antialias: True
+    - _target_: beast.utils.transforms.RandomShiftsAug
+      pad: 10
+    - _target_: beast.utils.transforms.ScaleImageTensor
+    - _target_: torchvision.transforms.Normalize
+      mean: [0.48145466, 0.4578275, 0.40821073]
+      std: [0.26862954, 0.26130258, 0.27577711]
+  rgb_gripper:
+    # - _target_: torchvision.transforms.ToTensor
+    - _target_: torchvision.transforms.Resize
+      size: 112
+      antialias: True
+    - _target_: beast.utils.transforms.RandomShiftsAug
+      pad: 4
+    - _target_: beast.utils.transforms.ScaleImageTensor
+    - _target_: torchvision.transforms.Normalize
+      mean: [0.48145466, 0.4578275, 0.40821073]
+      std: [0.26862954, 0.26130258, 0.27577711]
+
+val:
+  rgb_static:
+    # - _target_: torchvision.transforms.ToTensor
+    - _target_: torchvision.transforms.Resize
+      size: 112
+      antialias: True
+    - _target_: beast.utils.transforms.ScaleImageTensor
+    - _target_: torchvision.transforms.Normalize
+      mean: [ 0.48145466, 0.4578275, 0.40821073 ]
+      std: [ 0.26862954, 0.26130258, 0.27577711 ]
+  rgb_gripper:
+    # - _target_: torchvision.transforms.ToTensor
+    - _target_: torchvision.transforms.Resize
+      size: 112
+      antialias: True
+    - _target_: beast.utils.transforms.ScaleImageTensor
+    - _target_: torchvision.transforms.Normalize
+      mean: [ 0.48145466, 0.4578275, 0.40821073 ]
+      std: [ 0.26862954, 0.26130258, 0.27577711 ]
+
+ 

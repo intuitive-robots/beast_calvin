@@ -1,0 +1,48 @@
+defaults:
+  - transforms: calvin_transforms
+_target_: beast.datasets.hulc_data_module.HulcDataModule
+_recursive_: false
+
+root_data_dir: ${root_data_dir}
+action_space: 7
+action_max: [1., 1., 1., 1., 1., 1., 1.,]
+action_min: [-1., -1., -1., -1., -1., -1., -1]
+shuffle_val: false
+
+
+observation_space:
+  rgb_obs: ['rgb_static', 'rgb_gripper']
+  depth_obs: []
+  state_obs: ['robot_obs']
+  actions: ['rel_actions']
+  language: ['language']
+
+proprioception_dims:
+  n_state_obs: 8
+  keep_indices: [[0, 7], [14,15]]
+  robot_orientation_idx: [3, 6]
+  normalize: True
+  normalize_robot_orientation: True
+
+datasets:
+  lang_dataset: 
+    _target_: beast.datasets.disk_dataset.ExtendedDiskDataset
+    # min_samples_per_task: 20  # Adjust based on your needs
+     #subset_percentage: 0.1
+    # subset_seed: ${seed}
+    key: "lang"
+    save_format: "npz"
+    batch_size: ${batch_size}
+    min_window_size: ${act_seq_len}
+    max_window_size: ${act_seq_len}
+    proprio_state: ${datamodule.proprioception_dims}
+    obs_space: ${datamodule.observation_space}
+    skip_frames: 1
+    pad: false
+    lang_folder: ${lang_folder}
+    aux_lang_loss_window: 8
+    num_workers: ${num_workers}
+    action_seq_len: ${act_seq_len}
+    obs_seq_len: ${obs_seq_len}
+    future_range: 1
+    use_extracted_rel_actions: ${use_extracted_rel_actions}

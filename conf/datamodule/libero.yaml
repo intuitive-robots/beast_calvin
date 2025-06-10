@@ -1,0 +1,33 @@
+defaults:
+  - transforms: libero_transforms
+_target_: beast.datasets.libero_data_module.LiberoDataModule
+_recursive_: false
+
+
+root_data_dir: ${root_data_dir}
+action_space: 7
+shuffle_val: false
+benchmark_name: ${libero_benchmark}
+
+observation_space:
+  rgb_obs: ["agentview_rgb", "eye_in_hand_rgb"]
+  depth_obs: []
+  state_obs: ["gripper_states", "joint_states"]
+  actions: ['rel_actions']
+  language: ['language']
+
+proprioception_dims: None
+
+datasets:
+  lang_dataset:
+    _target_: beast.datasets.libero_dataset.LiberoMultitaskDataset
+    key: "lang"
+    benchmark_name: ${libero_benchmark}
+    batch_size: ${batch_size}
+    proprio_state: ${datamodule.proprioception_dims}
+    obs_space: ${datamodule.observation_space}
+    num_workers: ${num_workers}
+    action_seq_len: ${act_seq_len}
+    obs_seq_len: ${obs_seq_len}
+    split_ratio: 0.0
+    # custom_data_path: ??

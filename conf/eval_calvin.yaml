@@ -1,0 +1,29 @@
+defaults:
+  - annotations: new_playtable_validation
+  - callbacks/rollout_lh/tasks@tasks: new_playtable_tasks
+
+eval_cfg_overwrite:
+  datamodule:
+    datasets:
+      lang_dataset:
+        lang_folder: lang_annotations
+  model:
+    num_sampling_steps: ${num_sampling_steps}
+
+train_folder: 
+checkpoint: 
+device: 0
+
+
+log_dir: 
+dataset_path: 
+num_videos: 30
+debug: False
+
+log_wandb: True
+wandb_entity: 
+
+num_sequences: 100
+ep_len: 360
+num_sampling_steps: 4
+multistep: 10

@@ -1,0 +1,82 @@
+defaults:
+  - callbacks: libero
+  - datamodule: libero
+  - model: beast_f 
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+root_data_dir: /home/
+lang_folder: lang_clip_resnet50
+
+log_dir: ./logs
+slurm: false
+seed: 42
+device: 'cuda'
+batch_size: 1
+devices: 1
+goal_window_size: 1
+act_dim: 7
+proprio_dims: 9
+obs_dim: 512
+goal_dim: 512
+obs_seq_len: 1
+act_seq_len: 10
+multistep: ${act_seq_len}
+p_last_state: 0
+max_epochs: 300
+rollout_lh_skip_epochs: 9
+num_workers: 1
+benchmark_name: ${libero_benchmark} # calvin_abcd
+libero_benchmark: libero_goal # libero_goal # libero_spatial, libero_object, LIBERO_GOAL, LIBERO_90, LIBERO_10
+
+######## MP Tokenizer #########
+num_basis: 5
+seq_len: ${act_seq_len}
+vocab_size: 256
+degree_p: 4 # higher the smoother
+init_pos: False # if enabling the init_pos
+
+pre_compute_w_bound: False # True, False
+pre_compute_w_bound_steps: 10000000 # 1000
+update_w_bound: True # True, False
+
+vlm_path: microsoft/Florence-2-base
+
+
+trainer:
+  devices: ${devices}
+  precision: bf16-mixed
+  max_epochs: ${max_epochs}
+  sync_batchnorm: True
+  accelerator: gpu
+  strategy: "ddp" 
+  limit_train_batches: 1000
+  limit_val_batches: 4
+
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  save_dir: .
+  name: logger
+  group: beastf
+  log_model: false
+  project: CLEAN_BEAST_DEBUG
+  entity: <YourEntityName>
+  id: seq_${act_seq_len}_basis_${num_basis}_degree_${num_basis}
+
+
+hydra:
+  run:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ${log_dir}/runs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.override_dirname}
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - log_dir
+          - datamodule.root_data_dir
+          - trainer.gpus
+          - datamodule.num_workers
+          - trainer.limit_train_batches
+          - trainer.limit_val_batches

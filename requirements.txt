@@ -1,0 +1,25 @@
+--find-links https://download.pytorch.org/whl/cu116/torch_stable
+numpy>1.2
+hydra-core==1.1.1
+hydra-colorlog
+matplotlib
+opencv-python
+omegaconf
+plotly
+ftfy
+torch==2.2.2
+torchsde
+torchdiffeq
+pytorch-lightning==2.0.8
+gitpython
+scipy
+sentence-transformers
+transformers==4.50.2
+torchsde
+einops
+moviepy
+tqdm
+termcolor
+wandb
+einops_exts
+timm

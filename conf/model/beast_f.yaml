@@ -1,0 +1,63 @@
+_target_: beast.models.beast_florence.BEASTF
+_recursive_: false
+
+# VLM Configuration
+vlm_path: ${vlm_path}
+freeze_florence: False
+freeze_vision_tower: False
+vlm_prompt_style: default
+token_dropout: 0.1  # Added token dropout parameter
+
+# Model Structure
+multistep: ${multistep}
+num_sampling_steps: 4
+lowdim_obs_dim: 7
+action_dim: 7
+act_window_size: 10
+
+# pretraining stuff
+load_pretrained: False
+pretrained_model_path: "<PATH TO YOUR PRETRAINED MODEL>"
+# Model flags
+use_second_view: True
+second_view_key: image_wrist
+use_proprio: false
+return_act_chunk: false
+
+# Optimizer Configuration
+optimizer_type: adamw
+
+optimizer:
+  _target_: torch.optim.AdamW
+  transformer_weight_decay: 0.0 #0.05
+  learning_rate: 2e-5
+  betas: [0.9, 0.95]
+
+# Learning Rate Scheduler
+lr_scheduler:
+  lr_scheduler:
+    init_lr: 2e-5
+    init_lr_scale: 0.1
+    final_lr_scale: 0.5
+    total_steps: 50000
+    phase_ratio: "(0.05, 0.1, 0.85)"
+    lr: 2e-5
+
+update_w_bound: ${update_w_bound}
+pre_compute_w_bound: ${pre_compute_w_bound}
+pre_compute_w_bound_steps: ${pre_compute_w_bound_steps}
+
+mp_tokenizer:
+  _target_: beast.models.tokenizers.bspline_tokenizer.BSpline_Tokenizer
+  _recursive_: false
+  num_dof: 7
+  num_basis: ${num_basis}
+  duration: 1.0
+  seq_len: ${seq_len}
+  vocab_size: ${vocab_size}
+  degree_p: ${degree_p} # higher the smoother
+  gripper_zero_order: True
+  gripper_dof: 1
+  init_cond_order: 0
+  end_cond_order: 0
+  init_pos: ${init_pos}
