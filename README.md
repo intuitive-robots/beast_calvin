@@ -2,8 +2,7 @@
 
 # BEAST: Efficient Tokenization of B-Splines Encoded Action Sequences for Imitation Learning
 
-[**NeurIPS 2025**](https://openreview.net/forum?id=rQCl1sf62w)
-[**Paper**](https://www.google.com/search?q=https://openreview.net/pdf%3Fid%3DrQCl1sf62w) | [**Project Page**](https://intuitive-robots.github.io/beast_website/)
+[**Paper**]([https://www.google.com/search?q=https://openreview.net/pdf%3Fid%3DrQCl1sf62w](https://arxiv.org/pdf/2506.06072)) | [**Project Page**](https://intuitive-robots.github.io/beast_website/) | **NeurIPS 2025**
 
 This repository is the official implementation for the paper **BEAST: Efficient Tokenization of B-Splines Encoded Action Sequences for Imitation Learning** (NeurIPS 2025).
 
