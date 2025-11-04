@@ -1,6 +1,4 @@
-Here is the edited README, updated with a more descriptive introduction, the NeurIPS acceptance, and the BibTeX citation.
 
------
 
 # BEAST: Efficient Tokenization of B-Splines Encoded Action Sequences for Imitation Learning
 
