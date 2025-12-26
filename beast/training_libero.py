@@ -7,11 +7,29 @@ import wandb
 import hydra
 from omegaconf import DictConfig
 import torch
+
+torch.backends.cuda.matmul.allow_tf32 = False  # Reset legacy
+torch.backends.cudnn.allow_tf32 = False  # Reset legacy
+torch.set_float32_matmul_precision('high')  # Set using new API
+
 from pytorch_lightning import Callback, LightningModule, seed_everything, Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.utilities import rank_zero_only
 
+import torch._C
+original_get = torch._C._get_float32_matmul_precision
 
+def patched_get():
+    try:
+        return original_get()
+    except RuntimeError:
+        # Return a default value if mixed APIs detected
+        return "high"
+
+torch._C._get_float32_matmul_precision = patched_get
+
+# Now set precision
+torch.set_float32_matmul_precision('high')
 # This is for using the locally installed repo clone when using slurm
 sys.path.insert(0, Path(__file__).absolute().parents[1].as_posix())
 import beast.models.beast_florence as models_m
