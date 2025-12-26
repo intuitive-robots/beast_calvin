@@ -315,7 +315,7 @@ class RolloutLibero(Callback):
         init_states_path = os.path.join(
             self.init_states_folder, task_i.problem_folder, task_i.init_states_file
         )
-        init_states = torch.load(init_states_path)
+        init_states = torch.load(init_states_path, weights_only=False)
         num_success = 0
         for i in tqdm(range(start_rollout, end_rollout), desc="Evaluating"):
 

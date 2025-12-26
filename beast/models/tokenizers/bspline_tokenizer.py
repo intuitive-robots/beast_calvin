@@ -89,8 +89,8 @@ class BSpline_Tokenizer(TokenizerBase):
 
         self.times = mp_utils.tensor_linspace(0, duration, seq_len).to(device)
 
-        self.register_buffer("w_min", - 0.02 * torch.ones((num_dof * num_basis)))
-        self.register_buffer("w_max", 0.02 * torch.ones((num_dof * num_basis)))
+        self.register_buffer("w_min", - 1. * torch.ones((num_dof * num_basis)))
+        self.register_buffer("w_max", 1. * torch.ones((num_dof * num_basis)))
         self.vlm_vocab_size = None
 
     def fit_bpe(self, demos):
@@ -170,21 +170,21 @@ class BSpline_Tokenizer(TokenizerBase):
         tokens = einops.rearrange(tokens, 'b (d t) -> b (t d)', t=self.num_basis, d=self.num_dof)
         return tokens, params_dict
 
-    def tokens_to_llm_tokens(self, tokens):
-        if len(tokens.shape) == 3:
-            tokens = einops.rearrange(tokens, 'b t d -> b (t d)')
-        if self.vlm_vocab_size is None:
-            raise ValueError("VLM vocab size is not set.")
-        llm_tokens = self.vlm_vocab_size - 1 - tokens
-        return llm_tokens
+    # def tokens_to_llm_tokens(self, tokens):
+    #     if len(tokens.shape) == 3:
+    #         tokens = einops.rearrange(tokens, 'b t d -> b (t d)')
+    #     if self.vlm_vocab_size is None:
+    #         raise ValueError("VLM vocab size is not set.")
+    #     llm_tokens = self.vlm_vocab_size - 1 - tokens
+    #     return llm_tokens
 
-    def llm_tokens_to_mp_tokens(self, llm_tokens):
-        if self.vlm_vocab_size is None:
-            raise ValueError("VLM vocab is not set.")
-        tokens = self.vlm_vocab_size - 1 - llm_tokens
-        if len(tokens.shape) == 2:
-            tokens = einops.rearrange(tokens, 'b (t d) -> b t d', t=self.num_basis, d=self.num_dof)
-        return tokens
+    # def llm_tokens_to_mp_tokens(self, llm_tokens):
+    #     if self.vlm_vocab_size is None:
+    #         raise ValueError("VLM vocab is not set.")
+    #     tokens = self.vlm_vocab_size - 1 - llm_tokens
+    #     if len(tokens.shape) == 2:
+    #         tokens = einops.rearrange(tokens, 'b (t d) -> b t d', t=self.num_basis, d=self.num_dof)
+    #     return tokens
 
     def reconstruct_from_llm_tokens(self, llm_tokens, times=None, **kwargs):
         tokens = self.llm_tokens_to_mp_tokens(llm_tokens)

@@ -27,6 +27,7 @@ from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 from beast.utils.lr_schedulers.tri_stage_scheduler import TriStageLRScheduler
 from beast.callbacks.ema import EMA
 from beast.models.utils import generate_policy_prompt
+from transformers import AutoProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,16 @@ class BEASTF(pl.LightningModule):
         # self.tokenizer_vocab_size = self.tokenizer.vocab_size
         self.vlm_vocab_size = self.vlm.config.vocab_size - 1
         self.action_tokenizer.update_vlm_vocab_size(self.vlm_vocab_size)
+        self.huggingface_action_tokenizer = AutoProcessor.from_pretrained(
+                                                        "zhouhongyi/beast",
+                                                        trust_remote_code=True,
+                                                        num_dof = self.action_tokenizer.num_dof,
+                                                        num_basis = self.action_tokenizer.num_basis,
+                                                        seq_len = self.action_tokenizer.seq_length,
+                                                        gripper_dof = self.action_tokenizer.gripper_dof,
+                                                        gripper_zero_order = True,
+                                                    )
+        self.beast_vocab_size = self.huggingface_action_tokenizer.vocab_size
 
         self.update_w_bound = update_w_bound
         self.precompute_w_bound = pre_compute_w_bound
@@ -144,6 +155,23 @@ class BEASTF(pl.LightningModule):
 
         if load_pretrained and pretrained_model_path is not None:
             self._load_pretrained_weights(pretrained_model_path)
+    
+    def action_tokens_to_llm_tokens(self, action_tokens: torch.Tensor) -> torch.Tensor:
+        # if len(action_tokens.shape) == 3:
+            # action_tokens = einops.rearrange(action_tokens, 'b t d -> b (t d)')
+        if self.vlm_vocab_size is None:
+            raise ValueError("VLM vocab size is not set.")
+        llm_tokens = self.vlm_vocab_size - 1 - action_tokens
+        return llm_tokens
+    
+    def llm_tokens_to_action_tokens(self, llm_tokens: torch.Tensor) -> torch.Tensor:
+        if self.vlm_vocab_size is None:
+            raise ValueError("VLM vocab is not set.")
+        tokens = self.vlm_vocab_size - 1 - llm_tokens
+        # if len(tokens.shape) == 2:
+            # tokens = einops.rearrange(tokens, 'b (t d) -> b t d', t=self.num_basis, d=self.num_dof)
+        return tokens
+
     
 
     def _load_pretrained_weights(self, pretrained_model_path: str, mean_resizing: bool = False):
@@ -423,17 +451,25 @@ class BEASTF(pl.LightningModule):
 
         if "actions" in batch.keys():
 
-            action_tokens, params = self.action_tokenizer.encode(batch["actions"], update_bounds=self.update_w_bound)
+            # action_tokens, params = self.action_tokenizer.encode(batch["actions"], update_bounds=self.update_w_bound)
 
-            llm_label_ids = self.action_tokenizer.tokens_to_llm_tokens(action_tokens)
+            ### Compare huggingface tokenizer and our tokenizer
+            action_tokens = self.huggingface_action_tokenizer.encode_discrete(batch["actions"], update_bounds=self.update_w_bound)
 
-            input_tokens = self.action_tokenizer.vocab_size//2 * torch.ones_like(llm_label_ids, dtype=torch.long, device=self.device)
-            llm_input_ids = self.action_tokenizer.tokens_to_llm_tokens(input_tokens)
+            # llm_label_ids = self.action_tokenizer.tokens_to_llm_tokens(action_tokens)
+            llm_label_ids = self.action_tokens_to_llm_tokens(action_tokens)
+
+            input_tokens = self.beast_vocab_size//2 * torch.ones_like(llm_label_ids, dtype=torch.long, device=self.device)
+            llm_input_ids = self.action_tokens_to_llm_tokens(input_tokens)
 
             
             ### Sanity Check, check if the reconstructed tokens are correct
             # for i in range(len(batch["actions"])):
-                # self.action_tokenizer.visualize_reconstruction_error_with_llm_tokenizer(batch["actions"][i])
+            #     self.action_tokenizer.visualize_reconstruction_error_with_llm_tokenizer(batch["actions"][i])
+            #     print("Sanity check passed for reconstruction from llm tokens.")
+            #     self.huggingface_action_tokenizer.visualize_reconstruction_error_discrete(batch["actions"][i][None, ...])
+            #     print("Sanity check passed for reconstruction from discrete tokens.")
+            #     print("-------")
 
         bidirectional_mask = create_bidirectional_mask(
             batch_size=llm_label_ids.shape[0],
@@ -464,7 +500,9 @@ class BEASTF(pl.LightningModule):
         if "actions" in batch.keys():
             pred_tokens = torch.argmax(lm_logits, dim=-1)
             token_predict_accuracy = self.token_prediction_accuracy(pred_tokens, llm_label_ids)
-            reconstruct_traj = self.action_tokenizer.reconstruct_from_llm_tokens(pred_tokens, times=None)
+            # reconstruct_traj = self.action_tokenizer.reconstruct_from_llm_tokens(pred_tokens, times=None)
+            action_tokens = self.llm_tokens_to_action_tokens(pred_tokens)
+            reconstruct_traj = self.huggingface_action_tokenizer.decode_discrete(action_tokens)
             action_mse = F.mse_loss(reconstruct_traj, batch["actions"])
 
 
@@ -479,9 +517,9 @@ class BEASTF(pl.LightningModule):
         """Encode observations using Florence-2"""
         features, encoder_attn_mask = self.compute_input_features(batch)
 
-        input_tokens = self.action_tokenizer.vocab_size//2 * torch.ones((1, self.num_dof, self.num_basis), 
+        input_tokens = self.beast_vocab_size//2 * torch.ones((1, self.num_dof * self.num_basis), 
                                                                         dtype=torch.long, device=self.device)
-        llm_input_ids = self.action_tokenizer.tokens_to_llm_tokens(input_tokens)
+        llm_input_ids = self.action_tokens_to_llm_tokens(input_tokens)
 
         bidirectional_mask = create_bidirectional_mask(
             batch_size=llm_input_ids.shape[0],
@@ -532,7 +570,9 @@ class BEASTF(pl.LightningModule):
         llm_action_tokens = self.llm_generates(batch)
 
         if not self.action_tokenizer.init_pos:
-            actions = self.action_tokenizer.reconstruct_from_llm_tokens(llm_action_tokens, times=None)
+            # actions = self.action_tokenizer.reconstruct_from_llm_tokens(llm_action_tokens, times=None)
+            action_tokens = self.llm_tokens_to_action_tokens(llm_action_tokens)
+            actions = self.huggingface_action_tokenizer.decode_discrete(action_tokens)
         else:
             init_pos = self.pred_action_seq[:, -1, ...] if self.pred_action_seq is not None else None
             actions = self.action_tokenizer.reconstruct_from_llm_tokens(llm_action_tokens, times=None, init_p=init_pos)
