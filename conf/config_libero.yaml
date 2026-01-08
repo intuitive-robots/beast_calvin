@@ -12,7 +12,7 @@ log_dir: ./logs
 slurm: false
 seed: 42
 device: 'cuda'
-batch_size: 1
+batch_size: 16
 devices: 1
 goal_window_size: 1
 act_dim: 7
@@ -29,16 +29,11 @@ num_workers: 1
 benchmark_name: ${libero_benchmark} # calvin_abcd
 libero_benchmark: libero_goal # libero_goal # libero_spatial, libero_object, LIBERO_GOAL, LIBERO_90, LIBERO_10
 
-######## MP Tokenizer #########
+######## Action Tokenizer #########
 num_basis: 5
 seq_len: ${act_seq_len}
-vocab_size: 256
-degree_p: 4 # higher the smoother
-init_pos: False # if enabling the init_pos
-
-pre_compute_w_bound: False # True, False
-pre_compute_w_bound_steps: 10000000 # 1000
-update_w_bound: True # True, False
+update_w_bound: True
+enforce_init_pos: True
 
 vlm_path: microsoft/Florence-2-base
 
@@ -60,7 +55,7 @@ logger:
   group: beastf
   log_model: false
   project: CLEAN_BEAST_DEBUG
-  entity: <YourEntityName>
+  entity: zhouhongyi
   id: seq_${act_seq_len}_basis_${num_basis}_degree_${num_basis}
 
 

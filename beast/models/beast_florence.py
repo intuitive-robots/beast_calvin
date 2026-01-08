@@ -8,7 +8,6 @@ import functools
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import hydra
 from omegaconf import DictConfig, OmegaConf
 import pytorch_lightning as pl
 import einops
@@ -18,16 +17,11 @@ from einops_exts import rearrange_many
 import wandb
 from timm.layers.mlp import Mlp
 from transformers import AutoModelForCausalLM, AutoProcessor, AutoConfig
-import numpy as np
-from tqdm import tqdm
-import torch.distributed as dist
-from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 
 
 from beast.utils.lr_schedulers.tri_stage_scheduler import TriStageLRScheduler
 from beast.callbacks.ema import EMA
 from beast.models.utils import generate_policy_prompt
-from transformers import AutoProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +79,8 @@ class BEASTF(pl.LightningModule):
         optimizer: DictConfig = None,
         lr_scheduler: DictConfig = None,
 
-        # MP tokenizer
-        mp_tokenizer: DictConfig = None,
-        update_w_bound: bool = False,
-        pre_compute_w_bound: bool = False,
-        pre_compute_w_bound_steps: int = 50000,
+        # Action tokenizer config
+        action_tokenizer: DictConfig = None,
 
         load_pretrained: bool = False,
         pretrained_model_path: str = None,
@@ -132,26 +123,33 @@ class BEASTF(pl.LightningModule):
         self.lr_scheduler_config = lr_scheduler
         self.optimizer_type = optimizer_type
 
-        self.action_tokenizer = hydra.utils.instantiate(mp_tokenizer)
-        self.num_dof = self.action_tokenizer.num_dof
-        self.num_basis = self.action_tokenizer.num_basis
-        # self.tokenizer_vocab_size = self.tokenizer.vocab_size
-        self.vlm_vocab_size = self.vlm.config.vocab_size - 1
-        self.action_tokenizer.update_vlm_vocab_size(self.vlm_vocab_size)
-        self.huggingface_action_tokenizer = AutoProcessor.from_pretrained(
-                                                        "zhouhongyi/beast",
-                                                        trust_remote_code=True,
-                                                        num_dof = self.action_tokenizer.num_dof,
-                                                        num_basis = self.action_tokenizer.num_basis,
-                                                        seq_len = self.action_tokenizer.seq_length,
-                                                        gripper_dof = self.action_tokenizer.gripper_dof,
-                                                        gripper_zero_order = True,
-                                                    )
-        self.beast_vocab_size = self.huggingface_action_tokenizer.vocab_size
+        # Extract config values from action_tokenizer DictConfig
+        num_dof = action_tokenizer.num_dof
+        num_basis = action_tokenizer.num_basis
+        seq_len = action_tokenizer.seq_len
+        gripper_dof = action_tokenizer.gripper_dof
+        gripper_zero_order = action_tokenizer.get("gripper_zero_order", True)
+        update_w_bound = action_tokenizer.get("update_w_bound", False)
+        enforce_init_pos = action_tokenizer.get("enforce_init_pos", False)
 
+        self.num_dof = num_dof
+        self.num_basis = num_basis
+        self.seq_len = seq_len
+        self.gripper_dof = gripper_dof
         self.update_w_bound = update_w_bound
-        self.precompute_w_bound = pre_compute_w_bound
-        self.precompute_w_bound_steps = pre_compute_w_bound_steps
+        self.enforce_init_pos = enforce_init_pos
+
+        self.vlm_vocab_size = self.vlm.config.vocab_size - 1
+        self.huggingface_action_tokenizer = AutoProcessor.from_pretrained(
+            "zhouhongyi/beast",
+            trust_remote_code=True,
+            num_dof=num_dof,
+            num_basis=num_basis,
+            seq_len=seq_len,
+            gripper_dof=gripper_dof,
+            gripper_zero_order=gripper_zero_order,
+        )
+        self.beast_vocab_size = self.huggingface_action_tokenizer.vocab_size
 
         if load_pretrained and pretrained_model_path is not None:
             self._load_pretrained_weights(pretrained_model_path)
@@ -451,8 +449,6 @@ class BEASTF(pl.LightningModule):
 
         if "actions" in batch.keys():
 
-            # action_tokens, params = self.action_tokenizer.encode(batch["actions"], update_bounds=self.update_w_bound)
-
             ### Compare huggingface tokenizer and our tokenizer
             action_tokens = self.huggingface_action_tokenizer.encode_discrete(batch["actions"], update_bounds=self.update_w_bound)
 
@@ -462,14 +458,6 @@ class BEASTF(pl.LightningModule):
             input_tokens = self.beast_vocab_size//2 * torch.ones_like(llm_label_ids, dtype=torch.long, device=self.device)
             llm_input_ids = self.action_tokens_to_llm_tokens(input_tokens)
 
-            
-            ### Sanity Check, check if the reconstructed tokens are correct
-            # for i in range(len(batch["actions"])):
-            #     self.action_tokenizer.visualize_reconstruction_error_with_llm_tokenizer(batch["actions"][i])
-            #     print("Sanity check passed for reconstruction from llm tokens.")
-            #     self.huggingface_action_tokenizer.visualize_reconstruction_error_discrete(batch["actions"][i][None, ...])
-            #     print("Sanity check passed for reconstruction from discrete tokens.")
-            #     print("-------")
 
         bidirectional_mask = create_bidirectional_mask(
             batch_size=llm_label_ids.shape[0],
@@ -569,13 +557,12 @@ class BEASTF(pl.LightningModule):
 
         llm_action_tokens = self.llm_generates(batch)
 
-        if not self.action_tokenizer.init_pos:
-            # actions = self.action_tokenizer.reconstruct_from_llm_tokens(llm_action_tokens, times=None)
-            action_tokens = self.llm_tokens_to_action_tokens(llm_action_tokens)
-            actions = self.huggingface_action_tokenizer.decode_discrete(action_tokens)
-        else:
+        action_tokens = self.llm_tokens_to_action_tokens(llm_action_tokens)
+        if self.enforce_init_pos:
             init_pos = self.pred_action_seq[:, -1, ...] if self.pred_action_seq is not None else None
-            actions = self.action_tokenizer.reconstruct_from_llm_tokens(llm_action_tokens, times=None, init_p=init_pos)
+            actions = self.huggingface_action_tokenizer.decode_discrete(action_tokens, init_pos=init_pos)
+        else:
+            actions = self.huggingface_action_tokenizer.decode_discrete(action_tokens)
         return actions
 
     def step(self, obs: Dict, goal: Dict) -> torch.Tensor:
@@ -728,12 +715,6 @@ class BEASTF(pl.LightningModule):
             sync_dist=True
         )
         
-        # Log average action loss across modalities
-        # try:
-        #     n_modalities = len(self.trainer.datamodule.modalities)
-        # except AttributeError:
-        #     n_modalities = 1  # Default if modalities not available
-            
         self.log(
             "val/token_pred_acc",
             token_pred_acc,
@@ -746,110 +727,6 @@ class BEASTF(pl.LightningModule):
             sync_dist=True
         )
 
-    # def setup(self, stage):
-    #     # not working,ddp
-    #     # at least not working at setup stage, all things seems still on cpu, and ddp not fully initialized.
-    #     if stage != "fit":
-    #         return
-    #
-    #     log_rank_0("precompute mp normalizer")
-    #
-    #     local_mp_params = []
-    #     # params = []
-    #
-    #     loader = self.trainer.datamodule.train_dataloader()
-    #
-    #     for batch in tqdm(loader["lang"], desc=f"Rank_{self.global_rank}, precomputing weight normalizer of MP", unit="batch"):
-    #         act_chunks = batch["actions"][..., :self.action_tokenizer.joint_dof]
-    #         # !!! make sure the bounds are first set to -1 and 1 !!!
-    #         param = self.action_tokenizer.compute_weights(act_chunks)
-    #
-    #         param = param.to("cpu").numpy()
-    #         # params.append(param)
-    #         local_mp_params.append(param)
-    #
-    #     # params = np.concatenate(params, axis=0)
-    #     if self.global_rank==0:
-    #         params = self.gather_results(local_mp_params)
-    #
-    #         # params_mean = params.mean(axis=0)
-    #         # params_std = params.std(axis=0)
-    #         # params_min = params.min(axis=0)
-    #         # params_max = params.max(axis=0)
-    #         params_min = np.quantile(params, 0.01, 0)
-    #         params_max = np.quantile(params, 0.99, 0)
-    #
-    #         params_min = torch.from_numpy(params_min).to(self.device)
-    #         params_max = torch.from_numpy(params_max).to(self.device)
-    #
-    #         self.action_tokenizer.w_min[:self.action_tokenizer.joint_dof * self.num_basis] = params_min
-    #         self.action_tokenizer.w_max[:self.action_tokenizer.joint_dof * self.num_basis] = params_max
-    #
-    #     if self.trainer.world_size>1 and dist.is_initialized():
-    #         dist.broadcast(self.action_tokenizer.w_min, src=0)
-    #         dist.broadcast(self.action_tokenizer.w_max, src=0)
-    #
-    #     log_rank_0(f"mp weight normalizer calculated and set,"
-    #                f"mp weight bounds min {self.action_tokenizer.w_min} and max {self.action_tokenizer.w_max}")
-    #
-    # def gather_results(self, local_list):
-    #     # gather list of array into a array and return it to rank 0
-    #     local_array = np.concatenate(local_list, axis=0)
-    #
-    #     if not (dist.is_available() and dist.is_initialized()):
-    #         return local_array
-    #
-    #     world_size = dist.get_world_size()
-    #     gathered = [None for _ in range(world_size)]
-    #     dist.gather_object(local_array, gathered, dst=0)
-    #     gathered = np.concatenate(gathered, axis=0)
-    #     return gathered
 
 
-    def on_fit_start(self,):
-
-        if self.precompute_w_bound:
-            self.precompute_mp_normalizer()
-            # broadcast main process weight normalizer to other devices
-            if self.trainer.world_size>1 and dist.is_initialized():
-                dist.broadcast(self.action_tokenizer.w_min, src=0)
-                dist.broadcast(self.action_tokenizer.w_max, src=0)
-                logger.info(f"mp weight normalizer set in rank {self.global_rank}")
-        else:
-            logger.info("mp normalizer not precomputed, using default [-1, 1]")
-
-    @rank_zero_only
-    def precompute_mp_normalizer(self):
-        logger.info("precompute mp normalizer")
-
-        dataloader = self.trainer.datamodule.train_dataloader()
-
-        params = []
-        for batch in tqdm(dataloader["lang"], desc=f"Rank_{self.global_rank}, precomputing weight normalizer of MP", unit="batch"):
-            act_chunks = batch["actions"][..., :self.action_tokenizer.joint_dof]
-            act_chunks = act_chunks.to(self.device)
-            # !!! make sure the bounds are first set to -1 and 1 !!!
-            param = self.action_tokenizer.compute_weights(act_chunks)
-            param = param.to("cpu").numpy()
-            params.append(param)
-            # Break if we have enough samples
-            if len(params) > self.precompute_w_bound_steps:
-                logger.info(f"Rank_{self.global_rank}, precomputed enough samples for weight normalizer of MP")
-                break
-        params = np.concatenate(params, axis=0)
-
-        # params_mean = params.mean(axis=0)
-        # params_std = params.std(axis=0)
-        # params_min = params.min(axis=0)
-        # params_max = params.max(axis=0)
-        params_min = np.quantile(params, 0.01, 0)
-        params_max = np.quantile(params, 0.99, 0)
-
-        params_min = torch.from_numpy(params_min).to(self.action_tokenizer.w_min.device)
-        params_max = torch.from_numpy(params_max).to(self.action_tokenizer.w_max.device)
-
-        self.action_tokenizer.w_min[:self.action_tokenizer.joint_dof * self.num_basis] = params_min
-        self.action_tokenizer.w_max[:self.action_tokenizer.joint_dof * self.num_basis] = params_max
-
-        logger.info("mp_normalizer computed and set on rank 0")
 

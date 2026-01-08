@@ -31,17 +31,11 @@ use_extracted_rel_actions: true
 
 vlm_path: microsoft/Florence-2-base
 
-### MP Tokenizer
+### Action Tokenizer
 num_basis: 10
 seq_len: ${act_seq_len}
-vocab_size: 256
-degree_p: 4 # higher the smoother
-
-init_pos: False # if enabling the init_pos
-
-pre_compute_w_bound: False # True, False
-pre_compute_w_bound_steps: 10000 # 1000
-update_w_bound: True # True, False
+update_w_bound: True
+enforce_init_pos: False
 
 trainer:
   devices: ${devices}

@@ -43,21 +43,12 @@ lr_scheduler:
     phase_ratio: "(0.05, 0.1, 0.85)"
     lr: 2e-5
 
-update_w_bound: ${update_w_bound}
-pre_compute_w_bound: ${pre_compute_w_bound}
-pre_compute_w_bound_steps: ${pre_compute_w_bound_steps}
-
-mp_tokenizer:
-  _target_: beast.models.tokenizers.bspline_tokenizer.BSpline_Tokenizer
-  _recursive_: false
+# Action tokenizer config
+action_tokenizer:
   num_dof: 7
   num_basis: ${num_basis}
-  duration: 1.0
   seq_len: ${seq_len}
-  vocab_size: ${vocab_size}
-  degree_p: ${degree_p} # higher the smoother
-  gripper_zero_order: True
   gripper_dof: 1
-  init_cond_order: 0
-  end_cond_order: 0
-  init_pos: ${init_pos}
+  gripper_zero_order: true
+  update_w_bound: ${update_w_bound}
+  enforce_init_pos: ${enforce_init_pos}

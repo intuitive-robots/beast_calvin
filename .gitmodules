@@ -1,6 +1,3 @@
-[submodule "MP_lite_PyTorch"]
-	path = MP_lite_PyTorch
-	url = git@github.com:Andrewllab/MP_lite_PyTorch.git
 [submodule "calvin_env"]
 	path = calvin_env
 	url = git@github.com:mees/calvin_env.git
