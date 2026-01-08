@@ -2,13 +2,16 @@
 
 # BEAST: Efficient Tokenization of B-Splines Encoded Action Sequences for Imitation Learning
 
-[**Paper**]([https://www.google.com/search?q=https://openreview.net/pdf%3Fid%3DrQCl1sf62w](https://arxiv.org/pdf/2506.06072)) | [**Project Page**](https://intuitive-robots.github.io/beast_website/) | **NeurIPS 2025**
+[**Paper**](https://arxiv.org/abs/2506.06072) | [**Project Page**](https://intuitive-robots.github.io/beast_website/) | [**Hugging Face**](https://huggingface.co/zhouhongyi/beast)| [**NeurIPS 2025**](https://openreview.net/forum?id=rQCl1sf62w)  
 
 This repository is the official implementation for the paper **BEAST: Efficient Tokenization of B-Splines Encoded Action Sequences for Imitation Learning** (NeurIPS 2025).
 
 BEAST introduces a novel, highly efficient action representation for imitation learning. By encoding action sequences using B-Splines, it creates a compact, continuous, and expressive tokenization of robot trajectories. Our primary model, **BEAST-F**, models this continuous action-token space using a Rectified Flow model, achieving state-of-the-art performance on challenging long-horizon benchmarks, including CALVIN and LIBERO.
 
 This repository provides all the code necessary to download the datasets, preprocess the data, and reproduce our training and evaluation results.
+
+## Updates: 
+### 2026.01.08: BEAST is now officially on hugging face: [**https://huggingface.co/zhouhongyi/beast**](https://huggingface.co/zhouhongyi/beast)
 
 ## Installation
 
