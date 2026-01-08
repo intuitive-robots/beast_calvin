@@ -40,8 +40,6 @@ pip install numpy~=1.23
 cd ..
 pip install setuptools==57.5.0
 conda install conda-forge::pyhash
-cd MP_lite_PyTorch
-pip install -e .
 pip install addict
 cd ..
 ```
@@ -146,11 +144,6 @@ License: [https://github.com/Lifelong-Robot-Learning/LIBERO?tab=MIT-1-ov-file](h
 
 Original: [https://github.com/lukashermann/hulc](https://github.com/lukashermann/hulc)
 License: [MIT](https://github.com/lukashermann/hulc/blob/main/LICENSE)
-
-#### MP\_lite\_PyTorch
-
-Original: [https://github.com/Andrewllab/MP\_lite\_PyTorch](https://github.com/Andrewllab/MP_lite_PyTorch)
-License: [GPL](https://github.com/Andrewllab/MP_lite_PyTorch/blob/main/LICENSE)
 
 #### FLOWER
 
